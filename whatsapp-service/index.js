@@ -2,20 +2,16 @@
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
 
-// Initialize Firebase Admin SDK
+// Load Firebase Service Account from env
+let serviceAccount;
 try {
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-        });
-        console.log("🔥 Firebase Admin Initialized Successfully.");
-    }
-} catch (error) {
-    console.error("❌ Firebase Initialization Error:", error.message);
-    process.exit(1);
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} catch (err) {
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT env variable missing or invalid.");
+  process.exit(1);
 }
+
 
 const db = admin.firestore();
 
