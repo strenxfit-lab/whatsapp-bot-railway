@@ -1,4 +1,6 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import baileys from "@whiskeysockets/baileys";
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = baileys;
+
 import qrcode from "qrcode-terminal";
 import admin from "firebase-admin";
 
