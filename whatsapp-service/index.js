@@ -1,8 +1,9 @@
 import express from "express";
 import qrcode from "qrcode-terminal";
-import { Client, LocalAuth } from "whatsapp-web.js";
+import pkg from "whatsapp-web.js";
 import fetch from "node-fetch";
 
+const { Client, LocalAuth } = pkg;
 // Telegram credentials
 const TELEGRAM_BOT_TOKEN = "8499533147:AAEU0mkA7l0plfMHoK9zuYYmRdr_YOE-hik";
 const TELEGRAM_CHAT_ID = "6077248442";
