@@ -1,11 +1,15 @@
-2025-11-03T09:50:18.000000000Z [inf]  Starting Container
-2025-11-03T09:50:19.485762561Z [inf]  > node whatsapp-service/index.js
-2025-11-03T09:50:19.485778358Z [inf]  
-2025-11-03T09:50:19.485806172Z [inf]  
-2025-11-03T09:50:19.485812998Z [inf]  > whatsapp-bot-railway@1.0.0 start
-2025-11-03T09:50:39.111463951Z [inf]  QR generated — sending to Telegram...
-2025-11-03T09:50:39.111472747Z [err]  ❌ Telegram send error: TypeError: Failed to execute 'append' on 'FormData': parameter 2 is not of type 'Blob'
-2025-11-03T09:50:39.111478321Z [err]      at _FormData.append (node:internal/deps/undici/undici:5091:17)
-2025-11-03T09:50:39.111484346Z [err]      at sendToTelegram (file:///app/whatsapp-service/index.js:35:14)
-2025-11-03T09:50:39.111489162Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-2025-11-03T09:50:39.111494911Z [err]      at async Client.<anonymous> (file:///app/whatsapp-service/index.js:68:3)
+{
+  "name": "strenx-whatsapp-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node whatsapp-service/index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.0",
+    "whatsapp-web.js": "^1.20.0",
+    "qrcode": "^1.5.3",
+    "node-fetch": "^3.3.2",
+    "form-data": "^4.0.0"
+  }
+}
