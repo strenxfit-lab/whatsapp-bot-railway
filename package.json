@@ -1,13 +1,14 @@
 {
-  "name": "whatsapp-bot-railway",
+  "name": "strenx-whatsapp-bot",
   "version": "1.0.0",
   "type": "module",
+  "main": "index.js",
   "scripts": {
-   "start": "node whatsapp-service/index.js"
+    "start": "node index.js"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.6.0",
     "firebase-admin": "^11.11.0",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.20.0"
+    "qrcode-terminal": "^0.12.0"
   }
 }
