@@ -1,96 +1,82 @@
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
-import pkg from "whatsapp-web.js";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { sendAlert } from "./alert.js";
-client.on("disconnected", async (reason) => {
-  console.log("WhatsApp disconnected:", reason);
-  await sendAlert("WhatsApp disconnected! Please rescan QR to reconnect.");
-});
+import admin from "firebase-admin";
 
-const { Client, LocalAuth } = pkg;
-
-// 1. Load Firebase Service Account from Env Variable
+// ---------- FIREBASE SETUP ----------
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error("❌ FIREBASE_SERVICE_ACCOUNT env var missing");
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT missing");
   process.exit(1);
 }
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+const db = admin.firestore();
 
-initializeApp({ credential: cert(serviceAccount) });
-const db = getFirestore();
+// ---------- WHATSAPP CONNECTION ----------
+const connectBot = async () => {
+  const { state, saveCreds } = await useMultiFileAuthState("./session");
 
-// 2. WhatsApp Web Client Config
-const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "expert-hub-bot" }),
-  puppeteer: {
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-    ],
-  },
-});
+  const sock = makeWASocket({
+    printQRInTerminal: true,
+    auth: state,
+  });
 
-client.on("qr", (qr) => {
-  console.log("📱 Scan this QR to connect WhatsApp →");
-  qrcode.generate(qr, { small: true });
-});
+  sock.ev.on("connection.update", (update) => {
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) qrcode.generate(qr, { small: true });
+    if (connection === "open") console.log("✅ WhatsApp connected!");
+    if (connection === "close") {
+      const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      console.log("⚠️ Connection closed. Reconnecting...", shouldReconnect);
+      if (shouldReconnect) connectBot();
+    }
+  });
 
-client.on("ready", () => {
-  console.log("✅ WhatsApp bot ready and connected!");
-  startQueueListener();
-});
+  sock.ev.on("creds.update", saveCreds);
 
-client.on("auth_failure", (msg) => console.error("Auth failure:", msg));
-client.on("disconnected", (reason) => console.log("Disconnected:", reason));
+  listenFirestore(sock);
+};
 
-client.initialize();
-
-// 3. Firestore listener
-function startQueueListener() {
-  console.log("👂 Listening to Firestore queue...");
-  const queueQuery = db.collectionGroup("messageQueue");
-
-  queueQuery.onSnapshot((snap) => {
-    snap.docChanges().forEach((change) => {
+// ---------- FIRESTORE QUEUE ----------
+function listenFirestore(sock) {
+  console.log("👂 Listening for new messages...");
+  db.collectionGroup("messageQueue").onSnapshot((snap) => {
+    snap.docChanges().forEach(async (change) => {
       if (change.type === "added") {
         const data = change.doc.data();
         if (data.status === "pending") {
-          processQueueDoc(change.doc.ref, data);
+          await sendMessage(sock, change.doc.ref, data);
         }
       }
     });
   });
 }
 
-// 4. Send message
-async function processQueueDoc(docRef, data) {
+// ---------- SEND MESSAGE ----------
+async function sendMessage(sock, docRef, data) {
   try {
-    let raw = (data.to || data.memberNumber || "").toString().replace(/\D/g, "");
-    if (raw.length === 10) raw = "91" + raw;
-    const jid = `${raw}@c.us`;
+    const number = (data.to || "").replace(/\D/g, "");
+    if (number.length < 10) throw new Error("Invalid phone number");
+    const jid = `91${number.slice(-10)}@s.whatsapp.net`;
 
-    const message =
+    const text =
       data.message ||
-      `Welcome to Expert Hub Library 📚\nYour Login ID: ${data.loginId}\nPassword: ${data.password}\nLogin at: https://expert.strenxsoftware.in/auth/login`;
+      `Welcome to Expert Hub Library 📚\nLogin ID: ${data.loginId}\nPassword: ${data.password}\nLogin here: https://expert.strenxsoftware.in/auth/login`;
 
-    const isReg = await client.isRegisteredUser(jid);
-    if (!isReg) {
-      console.log("❌ Not a WhatsApp number:", jid);
-      await docRef.update({ status: "failed", error: "Invalid WhatsApp number" });
-      return;
-    }
+    await sock.sendMessage(jid, { text });
+    console.log(`✅ Message sent to ${jid}`);
 
-    await new Promise((r) => setTimeout(r, 3000)); // 3s delay
-    await client.sendMessage(jid, message);
-    console.log(`✅ Sent message to ${jid}`);
-
-    await docRef.update({ status: "sent", sentAt: new Date() });
+    await docRef.update({
+      status: "sent",
+      sentAt: new Date(),
+    });
   } catch (err) {
-    console.error("Send failed:", err);
-    await docRef.update({ status: "failed", error: String(err) });
+    console.error("❌ Send failed:", err.message);
+    await docRef.update({
+      status: "failed",
+      error: err.message,
+    });
   }
 }
+
+connectBot();
