@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+   "start": "node whatsapp-service/index.js"
   },
   "dependencies": {
     "firebase-admin": "^11.11.0",
