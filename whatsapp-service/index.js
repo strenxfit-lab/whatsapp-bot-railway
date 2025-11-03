@@ -1,8 +1,14 @@
+import express from "express";
 import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 import { readFileSync } from "fs";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+
+const app = express();
+
+app.get("/", (req, res) => res.send("✅ WhatsApp Bot Active"));
+app.listen(process.env.PORT || 3000, () => console.log("Server Live"));
 
 const { Client, LocalAuth } = pkg;
 
