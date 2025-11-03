@@ -1,6 +1,6 @@
 FROM node:18-bullseye
 
-# Install puppeteer deps
+# Install system dependencies for puppeteer
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -22,10 +22,20 @@ RUN apt-get update && apt-get install -y \
   --no-install-recommends && \
   rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
+
+# Copy all source files
 COPY . .
 
+# Expose port (if your bot needs it)
 EXPOSE 3000
+
+# Start the app
 CMD ["npm", "start"]
