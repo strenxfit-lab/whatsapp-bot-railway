@@ -1,8 +1,26 @@
-import baileys from "@whiskeysockets/baileys";
-const { makeWASocket, useMultiFileAuthState, DisconnectReason } = baileys;
-
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
 import admin from "firebase-admin";
+import fetch from "node-fetch";
+
+// ✅ Telegram Alert Function
+async function sendTelegramAlert(msg) {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return console.log("⚠️ Telegram config missing");
+
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: msg }),
+    });
+    console.log("📩 Telegram alert sent:", msg);
+  } catch (err) {
+    console.error("❌ Telegram alert failed:", err.message);
+  }
+}
 
 // ---------- FIREBASE SETUP ----------
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -22,20 +40,25 @@ const connectBot = async () => {
     auth: state,
   });
 
-  sock.ev.on("connection.update", (update) => {
+  sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
+
     if (qr) qrcode.generate(qr, { small: true });
     if (connection === "open") console.log("✅ WhatsApp connected!");
     if (connection === "close") {
-      const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log("⚠️ Connection closed. Reconnecting...", shouldReconnect);
-      if (shouldReconnect) connectBot();
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      console.log("⚠️ Connection closed:", statusCode);
+
+      if (statusCode === DisconnectReason.loggedOut) {
+        await sendTelegramAlert("🚨 WhatsApp Bot *LOGGED OUT*! Please rescan QR to reconnect.");
+      } else {
+        await sendTelegramAlert("⚠️ WhatsApp Bot *DISCONNECTED*. Attempting to reconnect...");
+        connectBot();
+      }
     }
   });
 
   sock.ev.on("creds.update", saveCreds);
-
   listenFirestore(sock);
 };
 
@@ -67,17 +90,10 @@ async function sendMessage(sock, docRef, data) {
 
     await sock.sendMessage(jid, { text });
     console.log(`✅ Message sent to ${jid}`);
-
-    await docRef.update({
-      status: "sent",
-      sentAt: new Date(),
-    });
+    await docRef.update({ status: "sent", sentAt: new Date() });
   } catch (err) {
     console.error("❌ Send failed:", err.message);
-    await docRef.update({
-      status: "failed",
-      error: err.message,
-    });
+    await docRef.update({ status: "failed", error: err.message });
   }
 }
 
