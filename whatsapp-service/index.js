@@ -2,6 +2,11 @@ import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { sendAlert } from "./alert.js";
+client.on("disconnected", async (reason) => {
+  console.log("WhatsApp disconnected:", reason);
+  await sendAlert("WhatsApp disconnected! Please rescan QR to reconnect.");
+});
 
 const { Client, LocalAuth } = pkg;
 
