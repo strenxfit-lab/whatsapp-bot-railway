@@ -35,10 +35,57 @@ const client = new Client({
   },
 });
 
+// ====== BUILD WELCOME MESSAGE (NO LOGIN MESSAGE EVER) ======
+function buildWelcomeMessage(data) {
+  const join = data.joiningDate.toDate();
+  const next = new Date(join);
+  next.setDate(next.getDate() + 30);
+
+  const formatted = next.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const lines = [];
+
+  lines.push(
+    `Thanks for Joining The Expert’s Hub Library Munirka New Delhi. Received your fees for ${data.planName}. Your next due date is on ${formatted}.`
+  );
+
+  // FEE BREAKDOWN
+  lines.push(
+    `\n${data.planName} - ${data.membershipAmount}rs`
+  );
+
+  if (data.registrationFee > 0)
+    lines.push(`Registration fees - ${data.registrationFee}rs`);
+
+  if (data.securityFee > 0)
+    lines.push(
+      `Security fees - ${data.securityFee}rs (refundable only if you text 15 days before your due date that you are leaving the library)`
+    );
+
+  // POLICY
+  lines.push(`
+Any indiscipline will lead to cancellation of your admission without any refund.
+
+The fees is non refundable in any situation.
+
+Note:- 200rs security only refundable in case if you’re leaving the library and texting on WhatsApp 15 days before your due date, and it will be adjustable if you went to vacation without any information and with information post your due date it will be adjustable and you have to pay again whenever you join again.
+
+Once you take the security refund you have to pay registration and security fees again whenever you join again.`);
+
+  return lines.join("\n");
+}
+
 // ====== 5) QR Send to Telegram ======
 async function sendToTelegram(qr) {
   try {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=400x400`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+      qr
+    )}&size=400x400`;
+
     const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`,
       {
@@ -86,52 +133,60 @@ function startQueueListener() {
   console.log("🔁 Listening for messageQueue entries...");
   const queueQuery = db.collectionGroup("messageQueue");
 
-  queueQuery.onSnapshot(async (snap) => {
-    for (const change of snap.docChanges()) {
-      if (change.type === "added") {
-        const data = change.doc.data();
-        if (data.status === "pending") {
-          await processQueueDoc(change.doc.ref, data);
+  queueQuery.onSnapshot(
+    async (snap) => {
+      for (const change of snap.docChanges()) {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          if (data.status === "pending") {
+            await processQueueDoc(change.doc.ref, data);
+          }
         }
       }
+    },
+    (err) => {
+      console.error("🔥 Snapshot error:", err);
     }
-  }, (err) => {
-    console.error("🔥 Snapshot error:", err);
-  });
+  );
 }
 
 async function processQueueDoc(docRef, data) {
   try {
-    // 🔹 Normalize phone number
-    let raw = (data.to || data.memberNumber || data.memberNumberRaw || "").toString();
+    // 🚫 BLOCK ANY LOGIN FIELDS
+    delete data.loginId;
+    delete data.password;
+    delete data.memberId;
+
+    // Normalize phone number
+    let raw = (data.to || data.memberNumber || "").toString();
     raw = raw.replace(/[^0-9]/g, "");
-    if (raw.length === 10) raw = "91" + raw; // default India
+    if (raw.length === 10) raw = "91" + raw;
     const jid = `${raw}@c.us`;
 
-    console.log(`📤 Sending message to ${jid} (${data.memberName || "member"})...`);
+    console.log(`📤 Sending message to ${jid} (${data.memberName})...`);
 
     const isReg = await client.isRegisteredUser(jid);
     if (!isReg) {
       console.log(`🚫 Not a WhatsApp number: ${jid}`);
-      await docRef.update({ status: "failed", error: "Not WhatsApp user", checkedAt: new Date() });
+      await docRef.update({
+        status: "failed",
+        error: "Not WhatsApp user",
+        checkedAt: new Date(),
+      });
       return;
     }
 
-    const message =
-      data.message ||
-      `Welcome to Expert Hub Library 📚\nYour Login ID: ${data.loginId || data.memberId}\nPassword: ${data.password}\n\nLogin: https://expert.strenxsoftware.in/auth/login`;
+    // Always use welcome message
+    const message = buildWelcomeMessage(data);
 
-    await new Promise((r) => setTimeout(r, 3000)); // small delay
+    await new Promise((r) => setTimeout(r, 2000));
     await client.sendMessage(jid, message);
 
     console.log(`✅ Sent successfully to ${jid}`);
+
     await docRef.update({ status: "sent", sentAt: new Date() });
   } catch (err) {
     console.error("❌ Send error:", err);
-    try {
-      await docRef.update({ status: "failed", error: String(err) });
-    } catch (e) {
-      console.error("⚠️ Failed to update doc:", e);
-    }
+    await docRef.update({ status: "failed", error: String(err) });
   }
 }
