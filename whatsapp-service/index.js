@@ -8,8 +8,8 @@ import { getFirestore } from "firebase-admin/firestore";
 const { Client, LocalAuth } = pkg;
 
 // ====== 1) Telegram Setup ======
-const TELEGRAM_BOT_TOKEN = "8499533147:AAEU0mkA7l0plfMHoK9zuYYmRdr_YOE-hik";
-const TELEGRAM_CHAT_ID = "6077248442";
+const TELEGRAM_BOT_TOKEN = "8445228246:AAEjlvBb_umDbIEoroqswE3mCYZYh_UQMsc";
+const TELEGRAM_CHAT_ID = "5132081198";
 
 // ====== 2) Express Server ======
 const app = express();
